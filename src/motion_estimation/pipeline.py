@@ -1,5 +1,5 @@
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from dataclasses import dataclass
 
 import numpy as np
@@ -22,7 +22,7 @@ def process_video(
     scale: float = 0.75,
     max_motion: float = 20.0,
     config: FarnebackConfig | None = None,
-) -> Iterator[FlowResult]:
+) -> Generator[FlowResult]:
     """Yield optical-flow results for consecutive video frames."""
     if config is None:
         config = FarnebackConfig()

@@ -1,4 +1,3 @@
-
 from dataclasses import dataclass
 from typing import NewType
 
@@ -6,8 +5,10 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-GrayImage = NewType("GrayImage" ,NDArray[np.uint8])
-Flow = NewType("Flow" ,NDArray[np.float32])
+from motion_estimation.types import parse_NDArray
+
+GrayImage = NewType("GrayImage", NDArray[np.uint8])
+Flow = NewType("Flow", NDArray[np.float32])
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,15 +34,22 @@ def farneback(
     if previous.shape != current.shape:
         raise ValueError("Input images must have identical dimensions")
 
-    return cv2.calcOpticalFlowFarneback(
-        previous,
-        current,
-        None,
-        config.pyr_scale,
-        config.levels,
-        config.winsize,
-        config.iterations,
-        config.poly_n,
-        config.poly_sigma,
-        config.flags,
+    flow = np.empty_like(previous)
+
+    return Flow(
+        parse_NDArray(
+            cv2.calcOpticalFlowFarneback(
+                previous,
+                current,
+                flow,
+                config.pyr_scale,
+                config.levels,
+                config.winsize,
+                config.iterations,
+                config.poly_n,
+                config.poly_sigma,
+                config.flags,
+            ),
+            np.float32,
+        )
     )

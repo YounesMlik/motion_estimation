@@ -1,4 +1,4 @@
-from collections.abc import Generator, Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import NewType
@@ -7,7 +7,10 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-Image = NewType("Image" ,NDArray[np.uint8])
+from motion_estimation.flow import GrayImage
+from motion_estimation.types import parse_NDArray
+
+Image = NewType("Image", NDArray[np.uint8])
 
 
 @contextmanager
@@ -31,7 +34,7 @@ def open_video(
 def read_video(
     path: str | Path,
     scale: float = 1.0,
-) -> Iterator[Image]:
+) -> Generator[Image]:
     """Yield resized BGR frames from a video."""
 
     if not 0 < scale <= 1:
@@ -53,9 +56,9 @@ def read_video(
                 )
                 frame = cv2.resize(frame, size)
 
-            yield frame
+            yield Image(parse_NDArray(frame, np.uint8))
 
 
-def to_grayscale(image: Image) -> Image:
+def to_grayscale(image: Image) -> GrayImage:
     """Convert a BGR image to grayscale."""
-    return cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return GrayImage(parse_NDArray(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), np.uint8))
