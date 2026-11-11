@@ -4,6 +4,8 @@ import cv2
 import numpy as np
 from numpy.typing import NDArray
 
+from motion_estimation.types import parse_NDArray
+
 from .flow import Flow
 
 BGRImage = NewType("BGRImage" ,NDArray[np.uint8])
@@ -33,4 +35,4 @@ def colorize(
         255,
     ).astype(np.uint8)
 
-    return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    return BGRImage(parse_NDArray(cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR), np.uint8))
