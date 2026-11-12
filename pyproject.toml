@@ -10,6 +10,7 @@ requires-python = ">=3.12"
 dependencies = [
     "ipykernel>=7.4.0",
     "matplotlib>=3.11.2",
+    "mediapy>=1.2.7",
     "numpy>=2.5.4",
     "opencv-python>=5.0.0.93",
     "pillow>=13.0.0",

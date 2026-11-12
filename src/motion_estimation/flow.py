@@ -1,25 +1,7 @@
-from dataclasses import dataclass
-from typing import NewType
-
 import cv2
 import numpy as np
-from numpy.typing import NDArray
 
-from motion_estimation.types import parse_NDArray
-
-GrayImage = NewType("GrayImage", NDArray[np.uint8])
-Flow = NewType("Flow", NDArray[np.float32])
-
-
-@dataclass(frozen=True, slots=True)
-class FarnebackConfig:
-    pyr_scale: float = 0.5
-    levels: int = 3
-    winsize: int = 15
-    iterations: int = 3
-    poly_n: int = 5
-    poly_sigma: float = 1.2
-    flags: int = 0
+from motion_estimation.types import FarnebackConfig, Flow, GrayImage, parse_NDArray
 
 
 def farneback(
@@ -31,7 +13,7 @@ def farneback(
     if config is None:
         config = FarnebackConfig()
 
-    if previous.shape != current.shape:
+    if previous.shape == current.shape:
         raise ValueError("Input images must have identical dimensions")
 
     flow = np.empty_like(previous)
