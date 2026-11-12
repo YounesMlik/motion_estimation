@@ -13,7 +13,7 @@ def farneback(
     if config is None:
         config = FarnebackConfig()
 
-    if previous.shape == current.shape:
+    if previous.shape != current.shape:
         raise ValueError("Input images must have identical dimensions")
 
     flow = np.empty_like(previous)
