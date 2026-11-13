@@ -143,12 +143,12 @@ def sparse_to_dense(
     if config is None:
         config = SparseToDenseConfig()
 
-    if previous.shape != current.shape:
-        raise ValueError("Input images must have identical dimensions")
+    flow = _init_flow(previous, current)
 
-    flow = cv2.optflow.calcOpticalFlowSparseToDense(
+    cv2.optflow.calcOpticalFlowSparseToDense(
         previous,
         current,
+        flow,
         grid_step=config.grid_step,
         k=config.k,
         sigma=config.sigma,
