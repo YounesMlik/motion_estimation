@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, NewType
+from typing import Any, NewType, overload
 
 import cv2
 import numpy as np
@@ -58,16 +58,24 @@ class SparseToDenseConfig:
     fgs_sigma: float = 1.5
 
 
-type FlowAlgorithmConfig = FarnebackConfig | DISConfig | SparseToDenseConfig
-type FlowAlgorithm[C: FlowAlgorithmConfig] = Callable[
-    [GrayImage, GrayImage, C | None], Flow
-]
+type FlowAlgorithmConfig = FarnebackConfig | DISConfig | SparseToDenseConfig | None
+type FlowAlgorithm[C: FlowAlgorithmConfig] = Callable[[GrayImage, GrayImage, C], Flow]
 
 
+@overload
 def parse_NDArray[DType: np.generic](
     image: NDArray[Any],
     dtype: type[DType],
-) -> NDArray[DType]:
+) -> NDArray[DType]: ...
+@overload
+def parse_NDArray[Shape: tuple[Any, ...], DType: np.generic](
+    image: np.ndarray[Shape, Any],
+    dtype: type[DType],
+) -> np.ndarray[Shape, np.dtype[DType]]: ...
+def parse_NDArray[Shape: tuple[Any, ...], DType: np.generic](
+    image: np.ndarray[Shape, Any],
+    dtype: type[DType],
+) -> np.ndarray[Shape, np.dtype[DType]]:
     if image.dtype != np.dtype(dtype):
         raise TypeError(f"Expected {dtype}, got {image.dtype}")
 

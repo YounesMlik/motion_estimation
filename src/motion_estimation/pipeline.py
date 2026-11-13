@@ -3,7 +3,14 @@ from collections.abc import Generator
 import numpy as np
 from numpy.typing import NDArray
 
-from .flow import dis, farneback
+from .flow import (
+    deep_flow,
+    dis,
+    dual_tvl1,
+    farneback,
+    pca_flow,
+    sparse_to_dense,
+)
 from .types import (
     FlowAlgorithm,
     FlowAlgorithmConfig,
@@ -20,8 +27,8 @@ def process_video[FAC: FlowAlgorithmConfig](
     *,
     visualizer: Visualizer = draw_flow_vectors,
     visualizer_config: VisualizerConfig | None = None,
-    flow_algorirtm: FlowAlgorithm[FAC] = dis,
-    flow_config: FAC | None = None,
+    flow_algorirtm: FlowAlgorithm[FAC] = farneback,
+    flow_config: FAC = None,
 ) -> Generator[FlowResult]:
     """Yield optical-flow results for consecutive video frames."""
 
