@@ -25,7 +25,7 @@ class VisualizerConfig:
     scale: float = 10
 
 
-Visualizer = Callable[[BGRImage, Flow, VisualizerConfig], BGRImage]
+type Visualizer = Callable[[BGRImage, Flow, VisualizerConfig], BGRImage]
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,8 +39,29 @@ class FarnebackConfig:
     flags: int = 0
 
 
-FlowAlgorithmConfig = FarnebackConfig
-FlowAlgorithm = Callable[[GrayImage, GrayImage, FlowAlgorithmConfig | None], Flow]
+@dataclass(frozen=True, slots=True)
+class DISConfig:
+    """Configuration for DIS optical flow."""
+
+    preset: int = cv2.DISOPTICAL_FLOW_PRESET_FAST
+
+
+@dataclass(frozen=True, slots=True)
+class SparseToDenseConfig:
+    """Configuration for sparse-to-dense optical flow."""
+
+    grid_step: int = 8
+    k: int = 128
+    sigma: float = 0.05
+    use_post_proc: bool = True
+    fgs_lambda: float = 500.0
+    fgs_sigma: float = 1.5
+
+
+type FlowAlgorithmConfig = FarnebackConfig | DISConfig | SparseToDenseConfig
+type FlowAlgorithm[C: FlowAlgorithmConfig] = Callable[
+    [GrayImage, GrayImage, C | None], Flow
+]
 
 
 def parse_NDArray[DType: np.generic](
