@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from types import NoneType
 from typing import Any, NewType, overload
 
 import cv2
@@ -58,7 +59,11 @@ class SparseToDenseConfig:
     fgs_sigma: float = 1.5
 
 
-type FlowAlgorithmConfig = FarnebackConfig | DISConfig | SparseToDenseConfig | None
+@dataclass(frozen=True, slots=True)
+class EmptyConfig: ...
+
+
+type FlowAlgorithmConfig = FarnebackConfig | DISConfig | SparseToDenseConfig | NoneType
 type FlowAlgorithm[C: FlowAlgorithmConfig] = Callable[[GrayImage, GrayImage, C], Flow]
 
 

@@ -1,4 +1,8 @@
-from typing import Any, Literal, overload
+from collections.abc import Callable
+from dataclasses import dataclass
+from functools import wraps
+from types import NoneType
+from typing import Any, Literal, Unpack, overload
 
 import cv2
 import numpy as np
@@ -7,6 +11,7 @@ from motion_estimation.types import (
     DISConfig,
     FarnebackConfig,
     Flow,
+    FlowAlgorithmConfig,
     GrayImage,
     SparseToDenseConfig,
     parse_NDArray,
@@ -17,33 +22,59 @@ from motion_estimation.types import (
 def _init_flow(
     previous: GrayImage,
     current: GrayImage,
-) -> np.typing.NDArray[np.float32]: ...
+) -> Flow: ...
 @overload
 def _init_flow[Shape: tuple[Any, ...]](
     previous: np.ndarray[Shape, np.dtype[np.uint8]],
     current: np.ndarray[Shape, np.dtype[np.uint8]],
-) -> np.ndarray[tuple[*Shape, Literal[2]], np.dtype[np.float32]]: ...
+) -> np.ndarray[tuple[Unpack[Shape], Literal[2]], np.dtype[np.float32]]: ...  # noqa: UP044
 def _init_flow[Shape: tuple[Any, ...]](
     previous: np.ndarray[Shape, np.dtype[np.uint8]],
     current: np.ndarray[Shape, np.dtype[np.uint8]],
-) -> np.ndarray[tuple[*Shape, Literal[2]], np.dtype[np.float32]]:
+) -> np.ndarray[tuple[Unpack[Shape], Literal[2]], np.dtype[np.float32]]:  # noqa: UP044
     if previous.shape != current.shape:
         raise ValueError("Input images must have identical dimensions")
 
     return np.zeros((*previous.shape, 2), dtype=np.float32)
 
 
+def cv2_algorithm_wrapper[ConfigT: FlowAlgorithmConfig](
+    config_type: type[ConfigT],
+) -> Callable[
+    [Callable[[GrayImage, GrayImage, Flow, ConfigT], None]],
+    Callable[[GrayImage, GrayImage, ConfigT | None], Flow],
+]:
+    def decorator(
+        calc: Callable[[GrayImage, GrayImage, Flow, ConfigT], None],
+    ) -> Callable[[GrayImage, GrayImage, ConfigT | None], Flow]:
+
+        @wraps(calc)
+        def wrapper(
+            previous: GrayImage,
+            current: GrayImage,
+            config: ConfigT | None = None,
+        ) -> Flow:
+            if config is None:
+                config = config_type()
+
+            flow = _init_flow(previous, current)
+
+            calc(previous, current, flow, config)
+
+            return Flow(parse_NDArray(flow, np.float32))
+
+        return wrapper
+
+    return decorator
+
+
+@cv2_algorithm_wrapper(FarnebackConfig)
 def farneback(
     previous: GrayImage,
     current: GrayImage,
-    config: FarnebackConfig | None = None,
-) -> Flow:
-    """Estimate dense optical flow between two grayscale images."""
-    if config is None:
-        config = FarnebackConfig()
-
-    flow = _init_flow(previous, current)
-
+    flow: Flow,
+    config: FarnebackConfig,
+) -> None:
     cv2.calcOpticalFlowFarneback(
         previous,
         current,
@@ -57,94 +88,70 @@ def farneback(
         config.flags,
     )
 
-    return Flow(parse_NDArray(flow, np.float32))
 
-
+@cv2_algorithm_wrapper(DISConfig)
 def dis(
     previous: GrayImage,
     current: GrayImage,
-    config: DISConfig | None = None,
-) -> Flow:
-    """Estimate dense optical flow using DIS."""
-    if config is None:
-        config = DISConfig()
-
-    flow = _init_flow(previous, current)
-
+    flow: Flow,
+    config: DISConfig,
+) -> None:
     cv2.DISOpticalFlow.create(config.preset).calc(
         previous,
         current,
         flow,
     )
 
-    return Flow(parse_NDArray(flow, np.float32))
 
-
+@cv2_algorithm_wrapper(NoneType)
 def dual_tvl1(
     previous: GrayImage,
     current: GrayImage,
-    config: None = None,
-) -> Flow:
-    """Estimate dense optical flow using Dual TV-L1."""
-
-    flow = _init_flow(previous, current)
-
+    flow: Flow,
+    config: None,
+) -> None:
     cv2.optflow.DualTVL1OpticalFlow.create().calc(
         previous,
         current,
         flow,
     )
 
-    return Flow(parse_NDArray(flow, np.float32))
 
-
+@cv2_algorithm_wrapper(NoneType)
 def deep_flow(
     previous: GrayImage,
     current: GrayImage,
-    config: None = None,
-) -> Flow:
-    """Estimate dense optical flow using DeepFlow."""
-
-    flow = _init_flow(previous, current)
-
+    flow: Flow,
+    config: None,
+) -> None:
     cv2.optflow.createOptFlow_DeepFlow().calc(
         previous,
         current,
         flow,
     )
 
-    return Flow(parse_NDArray(flow, np.float32))
 
-
+@cv2_algorithm_wrapper(NoneType)
 def pca_flow(
     previous: GrayImage,
     current: GrayImage,
-    config: None = None,
-) -> Flow:
-    """Estimate dense optical flow using PCAFlow."""
-
-    flow = _init_flow(previous, current)
-
+    flow: Flow,
+    config: None,
+) -> None:
     cv2.optflow.createOptFlow_PCAFlow().calc(
         previous,
         current,
         flow,
     )
 
-    return Flow(parse_NDArray(flow, np.float32))
 
-
+@cv2_algorithm_wrapper(SparseToDenseConfig)
 def sparse_to_dense(
     previous: GrayImage,
     current: GrayImage,
-    config: SparseToDenseConfig | None = None,
-) -> Flow:
-    """Estimate dense optical flow using sparse-to-dense interpolation."""
-    if config is None:
-        config = SparseToDenseConfig()
-
-    flow = _init_flow(previous, current)
-
+    flow: Flow,
+    config: SparseToDenseConfig,
+) -> None:
     cv2.optflow.calcOpticalFlowSparseToDense(
         previous,
         current,
@@ -156,5 +163,3 @@ def sparse_to_dense(
         fgs_lambda=config.fgs_lambda,
         fgs_sigma=config.fgs_sigma,
     )
-
-    return Flow(parse_NDArray(flow, np.float32))
