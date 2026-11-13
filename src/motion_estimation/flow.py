@@ -1,5 +1,4 @@
 from collections.abc import Callable
-from dataclasses import dataclass
 from functools import wraps
 from types import NoneType
 from typing import Any, Literal, Unpack, overload
