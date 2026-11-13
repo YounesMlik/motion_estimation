@@ -1,0 +1,1 @@
+uv run motion-estimation data/earth_30s.mp4
