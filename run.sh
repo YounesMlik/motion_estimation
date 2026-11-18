@@ -1,1 +1,1 @@
-uv run motion-estimation data/earth_30s.mp4
+uv run motion-estimation ./data/earth_30s.mp4

@@ -12,13 +12,14 @@ from .flow import (
     sparse_to_dense,
 )
 from .types import (
+    BGR2gray,
     FlowAlgorithm,
     FlowAlgorithmConfig,
     FlowResult,
     Visualizer,
     VisualizerConfig,
 )
-from .video import BGR_to_grayscale, read_video
+from .video import read_video
 from .visualization import draw_flow_vectors
 
 
@@ -38,7 +39,7 @@ def process_video[FAC: FlowAlgorithmConfig](
     previous: NDArray[np.uint8] | None = None
 
     for frame in read_video(path):
-        current = BGR_to_grayscale(frame)
+        current = BGR2gray(frame)
         
 
         if previous is not None:

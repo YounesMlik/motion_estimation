@@ -93,3 +93,15 @@ def RGB2BGR(image: RGBImage) -> BGRImage:
 
 def BGR2RGB(image: BGRImage) -> RGBImage:
     return RGBImage(parse_NDArray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), np.uint8))
+
+
+def BGR2gray(image: BGRImage) -> GrayImage:
+    return GrayImage(parse_NDArray(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), np.uint8))
+
+
+def RGB2gray(image: RGBImage) -> GrayImage:
+    return GrayImage(parse_NDArray(cv2.cvtColor(image, cv2.COLOR_RGB2GRAY), np.uint8))
+
+
+def gray2BGR(image: GrayImage) -> BGRImage:
+    return BGRImage(parse_NDArray(cv2.cvtColor(image, cv2.COLOR_GRAY2BGR), np.uint8))

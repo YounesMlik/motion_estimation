@@ -1,4 +1,4 @@
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -12,7 +12,7 @@ from motion_estimation.types import BGRImage, RGBImage, parse_NDArray
 @contextmanager
 def open_video(
     path: str | Path,
-) -> Generator[cv2.VideoCapture, None, None]:
+) -> Generator[cv2.VideoCapture]:
     """Open a video and guarantee that its capture is released."""
     if not Path(path).exists():
         raise RuntimeError(f"File does not exist: {path}")
@@ -31,7 +31,7 @@ def open_video(
 
 def read_video(
     path: str | Path,
-) -> Generator[BGRImage]:
+) -> Iterable[BGRImage]:
     """Yield resized BGR frames from a video."""
 
     with open_video(path) as capture:
@@ -44,11 +44,18 @@ def read_video(
             yield BGRImage(parse_NDArray(frame, np.uint8))
 
 
-def RGB_to_grayscale(image: RGBImage) -> GrayImage:
-    """Convert a RGB image to grayscale."""
-    return GrayImage(parse_NDArray(cv2.cvtColor(image, cv2.COLOR_RGB2GRAY), np.uint8))
+def show_video(frames: Iterable[BGRImage], *, fps: int = 30, title="Video"):
+    delay = round(1000 / fps)
+    try:
+        for frame in frames:
+            cv2.imshow(title, frame)
 
+            if cv2.waitKey(delay) & 0xFF == ord("q"):
+                break
 
-def BGR_to_grayscale(image: BGRImage) -> GrayImage:
-    """Convert a BGR image to grayscale."""
-    return GrayImage(parse_NDArray(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), np.uint8))
+            if cv2.getWindowProperty(title, cv2.WND_PROP_VISIBLE) < 1:
+                break
+    except cv2.error:
+        pass
+    finally:
+        cv2.destroyAllWindows()
