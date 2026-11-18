@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -8,15 +9,12 @@ from motion_estimation.types import BGR2gray, BGRImage, GrayImage
 
 type Image = NDArray[np.uint8]
 type Mask = NDArray[np.bool_]
-type Samples = NDArray[
-    np.uint8
-]  # (N, H, W, C) internally, with grayscale represented using an explicit singleton channel.
+type Samples = NDArray[np.uint8]  # (N, H, W)
 
 type Update = tuple[
-    np.ndarray,  # sample indices
+    np.ndarray,  # mask
     np.ndarray,  # destination rows
     np.ndarray,  # destination columns
-    np.ndarray,  # values
 ]
 
 OFFSETS = np.array(
@@ -25,6 +23,7 @@ OFFSETS = np.array(
         [-1, 0],
         [-1, 1],
         [0, -1],
+        [0, 0],
         [0, 1],
         [1, -1],
         [1, 0],
@@ -84,7 +83,7 @@ class ViBe:
         self.blink_count = np.zeros(self.shape, dtype=np.uint8)
 
         for i in range(self.config.nb_samples):
-            dy, dx = OFFSETS[self.rng.integers(8, size=self.shape)].transpose(2, 0, 1)
+            dy, dx = self._random_offsets()
             self.samples[i] = frame[
                 np.clip(ys + dy, 0, h - 1),
                 np.clip(xs + dx, 0, w - 1),
@@ -96,18 +95,15 @@ class ViBe:
             raise RuntimeError("Call initialize() first")
 
         foreground = self._classify(frame, self.samples)
-        temporal, spatial = self._update(frame, foreground)
-        self._apply_update(temporal)
-        self._apply_update(spatial)
+        spatial = self._update(frame, foreground)
+        self._apply_update(spatial, frame)
 
         return foreground.astype(np.uint8) * 255
 
-    def _validate_frame(self, frame: GrayImage):
-        if self.samples is None:
-            raise RuntimeError("Call initialize() first")
-
-        if frame.shape != self.shape:
-            raise ValueError("Frame shape changed")
+    def _random_offsets(self) -> np.ndarray[tuple[Literal[2], ...]]:
+        return OFFSETS[self.rng.integers(len(OFFSETS), size=self.shape)].transpose(
+            2, 0, 1
+        )
 
     def _classify(self, frame: GrayImage, samples: np.ndarray):
         cfg = self.config
@@ -117,16 +113,13 @@ class ViBe:
 
         return matches < cfg.req_matches
 
-    def _update(
-        self, frame: GrayImage, foreground: np.ndarray
-    ) -> tuple[Update, Update]:
+    def _update(self, frame: GrayImage, foreground: np.ndarray) -> Update:
         blinking = self._detect_blinking(foreground)
         background = ~foreground & ~blinking
 
-        temporal = self._temporal_updates(frame, background)
         spatial = self._spatial_updates(frame, background)
 
-        return temporal, spatial
+        return spatial
 
     def _detect_blinking(self, foreground: np.ndarray):
         if self.previous_foreground is None:
@@ -149,18 +142,6 @@ class ViBe:
 
         return self.blink_count >= cfg.blink_threshold
 
-    def _temporal_updates(self, frame: GrayImage, background: np.ndarray) -> Update:
-        cfg = self.config
-        ys, xs = np.indices(self.shape)
-
-        update = background & (
-            self.rng.integers(cfg.subsampling_factor, size=self.shape) == 0
-        )
-
-        indices = self.rng.integers(cfg.nb_samples, size=self.shape)
-
-        return indices[update], ys[update], xs[update], frame[update]
-
     def _spatial_updates(self, frame: GrayImage, background: np.ndarray) -> Update:
         cfg = self.config
         h, w = self.shape
@@ -170,25 +151,34 @@ class ViBe:
             self.rng.integers(cfg.subsampling_factor, size=self.shape) == 0
         )
 
-        dy, dx = OFFSETS[self.rng.integers(8, size=self.shape)].transpose(2, 0, 1)
+        dy, dx = self._random_offsets()
         ny, nx = ys + dy, xs + dx
 
         valid = update & (ny >= 0) & (ny < h) & (nx >= 0) & (nx < w)
 
-        indices = self.rng.integers(cfg.nb_samples, size=self.shape)
+        return valid, ny, nx
 
-        return indices[valid], ny[valid], nx[valid], frame[valid]
+    def _apply_update(self, update: Update, frame: GrayImage):
+        if self.samples is None:
+            raise RuntimeError("Call initialize() first")
+        indices = self.rng.integers(self.config.nb_samples, size=self.shape)
 
-    def _apply_update(self, update: Update):
+        mask, ys, xs = update
+        # print(ys)
+        self.samples[indices[mask], ys[mask], xs[mask]] = frame[mask]
+
+    def _validate_frame(self, frame: GrayImage):
         if self.samples is None:
             raise RuntimeError("Call initialize() first")
 
-        indices, ys, xs, values = update
-        self.samples[indices, ys, xs] = values
+        if frame.shape != self.shape:
+            raise ValueError("Frame shape changed")
 
     def reset(self):
         self.samples = None
         self.shape = None  # pyright: ignore[reportAttributeAccessIssue]
+        self.blink_count = None
+        self.previous_foreground = None
 
     @staticmethod
     def process_video(
