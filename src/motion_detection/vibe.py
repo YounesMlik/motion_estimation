@@ -66,15 +66,21 @@ class ViBeConfig:
 
 
 class ViBe:
+    config: ViBeConfig
+    seed: int | None
+    rng: np.random.Generator
+    samples: np.ndarray | None
+    shape: tuple
+    blink_count: np.ndarray | None
+    previous_foreground: np.ndarray | None
+
     def __init__(self, config: ViBeConfig | None, *, seed: int | None = None):
         self.config = config if config is not None else ViBeConfig()
-        self.rng = np.random.default_rng(seed)
-        self.shape: tuple = None  # pyright: ignore[reportAttributeAccessIssue]
-        self.samples = None  # (S, Y, X)
-        self.blink_count = None
-        self.previous_foreground = None
+        self.seed = seed
+        self.reset()
 
     def initialize(self, frame: GrayImage):
+        self.reset()
         h, w = frame.shape
         ys, xs = np.indices(frame.shape)
 
@@ -83,7 +89,7 @@ class ViBe:
         self.blink_count = np.zeros(self.shape, dtype=np.uint8)
 
         for i in range(self.config.nb_samples):
-            dy, dx = self._random_offsets()
+            dy, dx = self._choose_random_neighbor()
             self.samples[i] = frame[
                 np.clip(ys + dy, 0, h - 1),
                 np.clip(xs + dx, 0, w - 1),
@@ -95,31 +101,24 @@ class ViBe:
             raise RuntimeError("Call initialize() first")
 
         foreground = self._classify(frame, self.samples)
-        spatial = self._update(frame, foreground)
-        self._apply_update(spatial, frame)
+        blinking_mask = self._detect_blinking(foreground)
+        background = ~foreground & ~blinking_mask
+
+        update = self._generate_update(frame, background)
+        self._apply_update(update, frame)
 
         return foreground.astype(np.uint8) * 255
 
-    def _random_offsets(self) -> np.ndarray[tuple[Literal[2], ...]]:
+    def _choose_random_neighbor(self) -> np.ndarray[tuple[Literal[2], ...]]:
         return OFFSETS[self.rng.integers(len(OFFSETS), size=self.shape)].transpose(
             2, 0, 1
         )
 
     def _classify(self, frame: GrayImage, samples: np.ndarray):
-        cfg = self.config
-
         diff = np.maximum(samples, frame) - np.minimum(samples, frame)
-        matches = np.count_nonzero(diff < cfg.radius, axis=0)
+        matches = np.count_nonzero(diff < self.config.radius, axis=0)
 
-        return matches < cfg.req_matches
-
-    def _update(self, frame: GrayImage, foreground: np.ndarray) -> Update:
-        blinking = self._detect_blinking(foreground)
-        background = ~foreground & ~blinking
-
-        spatial = self._spatial_updates(frame, background)
-
-        return spatial
+        return matches < self.config.req_matches
 
     def _detect_blinking(self, foreground: np.ndarray):
         if self.previous_foreground is None:
@@ -129,29 +128,29 @@ class ViBe:
         if self.blink_count is None:
             raise RuntimeError("Blink counter not initialized")
 
-        cfg = self.config
         changed = foreground != self.previous_foreground
-        count = self.blink_count
 
         self.blink_count = np.where(
             changed,
-            np.minimum(count + cfg.blink_increment, cfg.blink_max),
-            np.maximum(count, cfg.blink_decrement) - cfg.blink_decrement,
+            np.minimum(
+                self.blink_count + self.config.blink_increment, self.config.blink_max
+            ),
+            np.maximum(self.blink_count, self.config.blink_decrement)
+            - self.config.blink_decrement,
         ).astype(np.uint8)
         self.previous_foreground = foreground.copy()
 
-        return self.blink_count >= cfg.blink_threshold
+        return self.blink_count >= self.config.blink_threshold
 
-    def _spatial_updates(self, frame: GrayImage, background: np.ndarray) -> Update:
-        cfg = self.config
+    def _generate_update(self, frame: GrayImage, background: np.ndarray) -> Update:
         h, w = self.shape
         ys, xs = np.indices(self.shape)
 
         update = background & (
-            self.rng.integers(cfg.subsampling_factor, size=self.shape) == 0
+            self.rng.integers(self.config.subsampling_factor, size=self.shape) == 0
         )
 
-        dy, dx = self._random_offsets()
+        dy, dx = self._choose_random_neighbor()
         ny, nx = ys + dy, xs + dx
 
         valid = update & (ny >= 0) & (ny < h) & (nx >= 0) & (nx < w)
@@ -175,8 +174,9 @@ class ViBe:
             raise ValueError("Frame shape changed")
 
     def reset(self):
+        self.rng = np.random.default_rng(self.seed)
         self.samples = None
-        self.shape = None  # pyright: ignore[reportAttributeAccessIssue]
+        self.shape: tuple = None  # pyright: ignore[reportAttributeAccessIssue]
         self.blink_count = None
         self.previous_foreground = None
 
