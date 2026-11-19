@@ -4,9 +4,9 @@ USE ieee.numeric_std.ALL;
 
 ENTITY classifier IS
     PORT (
-        pixel : IN unsigned(7 DOWNTO 0);
-        sample : IN unsigned(7 DOWNTO 0);
-        threshold : IN unsigned(7 DOWNTO 0);
+        pixel : IN unsigned(7 DOWNTO 0) := (OTHERS => '0');
+        sample : IN unsigned(7 DOWNTO 0) := (OTHERS => '0');
+        threshold : IN unsigned(7 DOWNTO 0) := (OTHERS => '0');
         is_match : OUT STD_LOGIC
     );
 END ENTITY;
