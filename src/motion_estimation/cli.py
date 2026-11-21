@@ -1,7 +1,5 @@
 import argparse
-from collections.abc import Iterable
 
-import cv2
 import numpy as np
 
 from motion_estimation.video import show_video

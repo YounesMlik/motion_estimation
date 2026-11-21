@@ -4,11 +4,12 @@ from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy import ndimage
 
-from motion_estimation.types import BGR2gray, BGRImage, GrayImage
+from motion_detection.utils import process_video_helper
+from motion_estimation.types import BGRImage, GrayImage
 
 type Image = NDArray[np.uint8]
-type Mask = NDArray[np.bool_]
 type Samples = NDArray[np.uint8]  # (N, H, W)
 
 type Update = tuple[
@@ -51,7 +52,7 @@ class ViBeConfig:
             raise ValueError("req_matches must be between 1 and nb_samples")
         if self.radius <= 0:
             raise ValueError("radius must be positive")
-        if self.subsampling_factor <= 1:
+        if self.subsampling_factor < 1:
             raise ValueError("subsampling_factor must be positive")
         if self.blink_increment < 1:
             raise ValueError("blink_increment must be positive")
@@ -107,7 +108,10 @@ class ViBe:
         update = self._generate_update(frame, background)
         self._apply_update(update, frame)
 
-        return foreground.astype(np.uint8) * 255
+        foreground = foreground.astype(np.uint8) * 255
+        foreground = ndimage.median_filter(foreground, 3)
+
+        return foreground
 
     def _choose_random_neighbor(self) -> np.ndarray[tuple[Literal[2], ...]]:
         return OFFSETS[self.rng.integers(len(OFFSETS), size=self.shape)].transpose(
@@ -185,18 +189,9 @@ class ViBe:
         video: Iterable[BGRImage],
         config: ViBeConfig | None = None,
         seed: int | None = None,
-    ) -> Iterable[Mask]:
+    ) -> Iterable[BGRImage]:
         vibe = ViBe(config, seed=seed)
 
-        return _process_video(video, vibe)
+        return process_video_helper(video, vibe)
 
 
-def _process_video(video: Iterable[BGRImage], vibe) -> Iterable[Mask]:
-    for i, frame in enumerate(video):
-        frame = BGR2gray(frame)
-        if i == 0:
-            vibe.initialize(frame)
-            continue
-
-        mask = vibe.apply(frame)
-        yield mask
